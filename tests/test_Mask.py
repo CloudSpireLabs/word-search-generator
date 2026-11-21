@@ -457,7 +457,7 @@ def test_masked_property_false(ws):
 
 def test_add_mask_error(ws):
     with pytest.raises(TypeError):
-        ws.apply_mask("J")  # type: ignore
+        ws.apply_mask("J")
 
 
 def test_apply_mask_method_1():
@@ -598,14 +598,14 @@ def test_reapply_masks_static(ws):
 def test_reapply_masks_dynamic_scale_up():
     ws = WordSearch("pig horse cow", size=11)
     ws.apply_mask(Star())
-    ct = sum([1 for x in ws.puzzle if x != ""])  # type: ignore
+    ct = sum([1 for x in ws.puzzle if x != ""])
     ws.size = 21
-    assert ct != sum([1 for x in ws.puzzle if x != ""])  # type: ignore
+    assert ct != sum([1 for x in ws.puzzle if x != ""])
 
 
 def test_reapply_masks_dynamic_scale_down():
     ws = WordSearch("pig horse cow", size=21)
     ws.apply_mask(Star())
-    ct = sum([1 for x in ws.puzzle if x != ""])  # type: ignore
+    ct = sum([1 for x in ws.puzzle if x != ""])
     ws.size = 11
-    assert ct != sum([1 for x in ws.puzzle if x != ""])  # type: ignore
+    assert ct != sum([1 for x in ws.puzzle if x != ""])

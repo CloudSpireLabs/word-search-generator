@@ -1,9 +1,8 @@
 VENV:=.venv
 BIN:=$(VENV)/bin
-PWD := $(realpath $(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 
 .DEFAULT_GOAL := help
-.PHONY: help
+.PHONY: help dev ipython clean cleanup lint typing test format nox build release
 ##@ General
 help: ## Display this help section
 	@echo $(MAKEFILE_LIST)
@@ -12,19 +11,14 @@ help: ## Display this help section
 ##@ Development
 dev: ## build a virtual environment for development
 	@echo "🏗️ setting up development environment..."
-	uv venv
 	uv sync --all-extras
-
-install: ## install package in development mode
-	@echo "📦 installing in development mode..."
-	uv pip install -e .
 
 ipython: ## run ipython inside of the uv venv
 	uv run --with ipython ipython
 
 clean: ## clean build artifacts and cache files
 	@echo "🧹 cleaning..."
-	rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .coverage .mypy_cache/
+	rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .coverage
 	find . -type d -name __pycache__ -delete
 	find . -type f -name "*.pyc" -delete
 
@@ -34,9 +28,8 @@ lint: ## lint the app using ruff
 	@echo "📝 linting..."
 	uv run ruff check --fix
 
-typing: ## type check the app using mypy
+typing: ## type check the app using ty
 	@echo "📝 type checking..."
-	uv run mypy src tests
 	uv run ty check src tests
 
 test: ## test the app using pytest
@@ -47,27 +40,16 @@ format: ## runs cleaners
 	@echo "🧾 formatting..."
 	uv run ruff format
 
-polish: cleanup test  ## cleans and lints before running the test suite
-
-verify: test ## run all verification steps
-	@echo "✅ all checks passed"
-
 nox: ## runs linting, formatting, type checking, and tests on all specified envs via nox
 	@echo "🎯 nox..."
-	uv run nox -p
+	uv run nox
 
 ##@ Build
-build: cleanup ## build the app package
+build: cleanup test ## build the app package
 	@echo "🏗️ building package..."
 	uv build
 
 ##@ Release
-pre-release: build ## verify package before release
-	@echo "🔍 verifying package..."
-	uvx twine check dist/*
-	@echo "📋 package contents:"
-	@ls -la dist/
-
-release: pre-release ## release on pypi (with verification)
+release: build ## release on pypi (with verification)
 	@echo "🚀 uploading to PyPI..."
-	uvx twine upload dist/*.whl dist/*.tar.gz
+	uv publish

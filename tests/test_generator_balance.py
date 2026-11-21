@@ -13,9 +13,9 @@ from word_search_generator.word_search._generator import WordSearchGenerator, _a
 
 def _line_counts(ws: WordSearch, secret: bool = False) -> Counter[tuple[int, int]]:
     return Counter(
-        _axis(w.direction)  # type: ignore[arg-type]
+        _axis(w.direction)
         for w in ws.placed_words
-        if w.secret is secret
+        if w.secret is secret and w.direction is not None
     )
 
 
@@ -23,7 +23,7 @@ def _prepared_generator(level: int = 3) -> WordSearchGenerator:
     """A generator with an empty 15x15 puzzle, ready for placement calls."""
     ws = WordSearch("placeholder", level=level, size=15)
     gen = WordSearchGenerator()
-    gen.game = ws  # type: ignore[assignment]  # GameType is an unbound TypeVar
+    gen.game = ws
     gen.puzzle = ws._build_puzzle(ws.size, "")
     gen._axis_counts = {False: Counter(), True: Counter()}
     gen._line = None

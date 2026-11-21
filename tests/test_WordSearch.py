@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from ordered_set import OrderedSet
 from rich.color import ColorSystem
 from rich.console import Console
 
@@ -36,7 +37,7 @@ def check_key(key: Key, puzzle: Puzzle) -> bool:
     """Test the puzzle key against the current puzzle state."""
     for word, info in key.items():
         row, col = info["start"]  # type: ignore
-        d = info["direction"]  # type: ignore
+        d = info["direction"]
         for char in word:
             if puzzle[row][col] != char:  # type: ignore
                 return False
@@ -191,7 +192,7 @@ def test_clearing_secret_directions(words):
 
 def test_get_level(ws: WordSearch):
     ws.level = 2
-    assert ws.level == LEVEL_DIRS[2]  # type: ignore
+    assert ws.level == LEVEL_DIRS[2]
 
 
 def test_add_words_with_resize(ws: WordSearch):
@@ -295,7 +296,9 @@ def test_puzzle_solution_output(builtin_mask_shapes, capsys):
     mask: Mask = mask_class()
     if mask:
         ws.apply_mask(mask)
-    ws.formatter.CONSOLE = Console(color_system="truecolor", force_terminal=True)  # type: ignore[union-attr]
+    ws.formatter.CONSOLE = Console(  # ty:ignore[invalid-assignment]
+        color_system="truecolor", force_terminal=True
+    )
     ws.show(solution=True)
 
     captured = capsys.readouterr()
@@ -447,7 +450,7 @@ def test_word_directions(words, secret_words):
 def test_validator_setter(words):
     ws: WordSearch = WordSearch(words, validators=None)
     ws.validators = [NoSingleLetterWords()]
-    assert all(isinstance(v, NoSingleLetterWords) for v in ws.validators)  # type: ignore[union-attr]
+    assert all(isinstance(v, NoSingleLetterWords) for v in ws.validators)  # ty:ignore[not-iterable]
 
 
 def test_validator_setter_invalid_validator(words):
@@ -455,11 +458,11 @@ def test_validator_setter_invalid_validator(words):
         pass
 
     with pytest.raises(TypeError):
-        WordSearch(words, validators=[Val()])  # type: ignore[list-item]
+        WordSearch(words, validators=[Val()])  # ty:ignore[invalid-argument-type]
 
 
 def test_no_words_to_generate(ws: WordSearch):
-    ws._words = WordSet()
+    ws._words: WordSet = OrderedSet()
     with pytest.raises(EmptyWordlistError):
         ws.generate()
 

@@ -78,7 +78,7 @@ def test_set_puzzle_level(
 )
 def test_set_secret_level(words, level: int, expected: set[Direction]):
     ws = WordSearch(words)
-    ws.secret_directions = level  # type: ignore[assignment]
+    ws.secret_directions = level
     assert ws.secret_directions == expected
 
 
@@ -146,14 +146,16 @@ def test_invalid_puzzle_size(ws: WordSearch, size, expected_size):
 def test_cleanup_input(base_game: Game, words: str, ct: int):
     assert len(base_game._cleanup_input(words, False)) == ct
     with pytest.raises(TypeError):
-        base_game._cleanup_input(["cat", "bat", "rat"])  # type: ignore[arg-type]
+        base_game._cleanup_input(
+            ["cat", "bat", "rat"]  # ty:ignore[invalid-argument-type]
+        )
     with pytest.raises(TypeError):
         base_game._cleanup_input(1, False, 10)  # type: ignore
 
 
 def test_invalid_level_direction_type(base_game: Game):
     with pytest.raises(TypeError):
-        base_game.validate_level(None)
+        base_game.validate_level(None)  # ty:ignore[invalid-argument-type]
 
 
 def test_missing_generator():
@@ -279,7 +281,7 @@ def test_missing_formatter(tmp_path: Path):
 def test_missing_default_formatter(tmp_path: Path):
     words = OrderedSet([Word("dog"), Word("cat"), Word("horse")])
     game = Game(words, generator=WordSearchGenerator())
-    game.formatter = game.DEFAULT_FORMATTER = None  # type: ignore[assignment]
+    game.formatter = game.DEFAULT_FORMATTER = None  # ty:ignore[invalid-attribute-access]
     with pytest.raises(MissingFormatterError):
         game.save(tmp_path.joinpath("hey-yo.pdf"))
 
@@ -341,6 +343,35 @@ def test_puzzle_inequality_diff_type(words):
     assert g != "cat"
 
 
-@pytest.mark.skip(reason="need to figure out how to represent generator and formatter")
 def test_repr(base_game: Game):
-    assert eval(repr(base_game)) == base_game
+    """Test that repr is informative and parameters can recreate equivalent games.
+
+    The repr focuses on core puzzle characteristics (words, level, size) that
+    define puzzle identity according to __eq__. It does not include implementation
+    details like generator, formatter, or validators.
+    """
+    repr_str = repr(base_game)
+
+    # Repr should contain the class name and key parameters
+    assert "Game" in repr_str
+    assert "words=" in repr_str
+    assert "level=" in repr_str
+    assert "size=" in repr_str
+
+    # Repr should contain all word texts
+    for word in base_game.words:
+        assert word.text in repr_str
+
+    # Create an equivalent game using the same parameters
+    words_list = ",".join(word.text for word in base_game.words)
+    equivalent_game = Game(
+        words=words_list,
+        level=",".join(d.name for d in base_game.directions),
+        size=base_game.size,
+        generator=base_game.generator,
+        formatter=base_game.formatter,
+        validators=base_game._validators,
+    )
+
+    # Should be equal according to __eq__ (compares words, directions, size)
+    assert equivalent_game == base_game
