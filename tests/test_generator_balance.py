@@ -133,3 +133,19 @@ def test_words_spread_evenly_across_lines(level: int, lines: int):
     for count in total.values():
         assert count / placed == pytest.approx(share, abs=0.03)
     assert sum(spreads) / len(spreads) <= 0.5
+
+
+def test_find_a_fit_secret_word_needs_secret_directions():
+    gen = _prepared_generator()
+    assert isinstance(gen.game, WordSearch)
+    gen.game._secret_directions = set()  # bypass the setter's validation
+    with pytest.raises(RuntimeError, match="non-empty secret_directions"):
+        gen.find_a_fit(Word("cat", secret=True), (7, 7))
+
+
+def test_secret_word_without_secret_directions_is_skipped():
+    gen = _prepared_generator()
+    assert isinstance(gen.game, WordSearch)
+    gen.game._secret_directions = set()  # bypass the setter's validation
+    word = Word("cat", secret=True)
+    assert gen._lines_by_use(word) == []
