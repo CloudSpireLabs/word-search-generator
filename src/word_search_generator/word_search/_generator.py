@@ -11,6 +11,7 @@ alphabet.
 from __future__ import annotations
 
 import random
+from collections import Counter
 from typing import TYPE_CHECKING
 
 from ..core.game import Puzzle
@@ -25,6 +26,24 @@ if TYPE_CHECKING:
 
 type Fit = tuple[str, list[tuple[int, int]]]
 type Fits = list[tuple[str, list[tuple[int, int]]]]
+type Axis = tuple[int, int]
+
+
+def _axis(direction: Direction) -> Axis:
+    """Return a key shared by `direction` and its opposite.
+
+    The 8 standard directions fall on 4 lines: N/S, E/W, NE/SW and NW/SE.
+    Works on the raw (row, col) movement, so the opposite does not need to
+    be a `Direction` member.
+
+    Args:
+        direction: The direction to find the line for.
+
+    Returns:
+        The larger of the direction's movement tuple and its negation.
+    """
+    opposite = (-direction.r_move, -direction.c_move)
+    return max(direction.value, opposite)
 
 
 class WordSearchGenerator(Generator):
@@ -35,6 +54,11 @@ class WordSearchGenerator(Generator):
     2. Handles both regular and secret words with different placement rules
     3. Fills remaining spaces with random characters to complete the puzzle
     4. Includes validation to prevent unintended word duplicates
+
+    Words are spread evenly across lines of direction: each word is tried on
+    the line (N/S, E/W, NE/SW or NW/SE) that the fewest words use so far, then
+    on the next least-used line if it doesn't fit there. Hidden and secret
+    words are balanced separately.
     """
 
     def generate(self, game: Game) -> Puzzle:
@@ -55,6 +79,13 @@ class WordSearchGenerator(Generator):
         """
         self.game = game
         self.puzzle = game._build_puzzle(game.size, "")
+        # words placed on each line so far, keyed by `Word.secret`
+        self._axis_counts: dict[bool, Counter[Axis]] = {
+            False: Counter(),
+            True: Counter(),
+        }
+        # line the word being placed is restricted to (None means any line)
+        self._line: Axis | None = None
         self.fill_words()
         if any(word.placed for word in game.words):
             self.fill_blanks()
@@ -204,10 +235,11 @@ class WordSearchGenerator(Generator):
         return coordinates
 
     def find_a_fit(self, word: Word, position: tuple[int, int]) -> Fit:
-        """Collect every valid direction from ``position`` and pick one at random.
+        """Collect valid directions from ``position`` and pick one at random.
 
         Secret words are tested against ``secret_directions``; all other
-        words use the game's primary direction set.
+        words use the game's primary direction set.  Only directions on the
+        current line (``self._line``) are tried, unless no line is set.
 
         Args:
             word: The :class:`~word_search_generator.core.word.Word` to place.
@@ -223,17 +255,13 @@ class WordSearchGenerator(Generator):
                 is empty or missing.
         """
         fits: Fits = []
-        # check all directions for level
-        if word.secret:
-            possible_directions: DirectionSet | None = getattr(
-                self.game, "secret_directions", None
-            )
-            if not possible_directions:
-                raise RuntimeError("Secret words require non-empty secret_directions")
-        else:
-            possible_directions: DirectionSet = self.game.directions
+        possible_directions = self._word_directions(word)
+        if word.secret and not possible_directions:
+            raise RuntimeError("Secret words require non-empty secret_directions")
 
         for d in possible_directions:
+            if self._line is not None and _axis(Direction(d)) != self._line:
+                continue
             coords = self.test_a_fit(word.text, position, d)
             if coords:
                 fits.append((Direction(d).name, coords))
@@ -241,6 +269,30 @@ class WordSearchGenerator(Generator):
         if not fits:
             raise WordFitError
         return random.choice(fits)
+
+    def _word_directions(self, word: Word) -> DirectionSet:
+        """Return the directions allowed for ``word``.
+
+        Args:
+            word: The word being placed.
+
+        Returns:
+            ``secret_directions`` for a secret word (empty if the game has
+            none), otherwise the game's primary direction set.
+        """
+        if word.secret:
+            secret_directions: DirectionSet | None = getattr(
+                self.game, "secret_directions", None
+            )
+            return secret_directions or set()
+        return self.game.directions
+
+    def _lines_by_use(self, word: Word) -> list[Axis]:
+        """Lines allowed for `word`, least-used first, ties in random order."""
+        lines = list({_axis(Direction(d)) for d in self._word_directions(word)})
+        random.shuffle(lines)
+        counts = self._axis_counts[word.secret]
+        return sorted(lines, key=lambda line: counts[line])
 
     def fill_words(self) -> None:
         """Attempt to place every game word into the puzzle grid.
@@ -261,7 +313,14 @@ class WordSearchGenerator(Generator):
                 self.game.validators, placed_words
             ):
                 continue
-            fit = self.try_to_fit_word(word)
+            # try the least-used line first, then the others in order
+            fit = None
+            for line in self._lines_by_use(word):
+                self._line = line
+                fit = self.try_to_fit_word(word)
+                if fit:
+                    break
+            self._line = None
             # Handle graceful failure from retry decorator (returns None on failure)
             if fit is not None and fit:
                 placed_words.append(word.text)
@@ -329,6 +388,7 @@ class WordSearchGenerator(Generator):
         word.start_column = col
         word.direction = Direction[d]
         word.coordinates = coords
+        self._axis_counts[word.secret][_axis(word.direction)] += 1
 
         return word.placed
 
